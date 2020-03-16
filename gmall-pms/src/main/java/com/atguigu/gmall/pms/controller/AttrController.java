@@ -33,6 +33,17 @@ public class AttrController {
     @Autowired
     private AttrService attrService;
 
+
+    /**
+     * 查询分类下的规格参数
+     */
+    @GetMapping
+    public Resp<PageVo> queryByType(QueryCondition queryCondition, @RequestParam("cid")Long cateId, @RequestParam("type")Long type) {
+        PageVo page = attrService.queryByType(queryCondition, cateId, type);
+        return Resp.ok(page);
+    }
+
+
     /**
      * 列表
      */
