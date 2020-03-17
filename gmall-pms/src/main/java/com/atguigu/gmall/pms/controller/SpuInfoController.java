@@ -5,8 +5,11 @@ import java.util.Map;
 
 
 import com.atguigu.core.bean.PageVo;
+import com.atguigu.core.bean.Query;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +36,15 @@ public class SpuInfoController {
     @Autowired
     private SpuInfoService spuInfoService;
 
+    /**
+     * 查询
+     */
+    @GetMapping
+    public Resp<PageVo> querySpuPage(QueryCondition queryCondition, @RequestParam("catId") Long catId) {
+        PageVo pageVo = spuInfoService.querySpuPage(queryCondition, catId);
+        return Resp.ok(pageVo);
+
+    }
     /**
      * 列表
      */

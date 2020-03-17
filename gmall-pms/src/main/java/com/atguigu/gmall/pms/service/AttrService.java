@@ -1,5 +1,6 @@
 package com.atguigu.gmall.pms.service;
 
+import com.atguigu.gmall.pms.vo.AttrIncloudGroupEntity;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.atguigu.gmall.pms.entity.AttrEntity;
 import com.atguigu.core.bean.PageVo;
@@ -18,5 +19,7 @@ public interface AttrService extends IService<AttrEntity> {
     PageVo queryPage(QueryCondition params);
 
     PageVo queryByType(QueryCondition queryCondition, Long cateId, Long type);
+
+    boolean saveAttr(AttrIncloudGroupEntity attr);
 }
 

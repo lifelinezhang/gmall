@@ -1,12 +1,15 @@
 package com.atguigu.gmall.pms.controller;
 
+import java.sql.Wrapper;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 
 import com.atguigu.core.bean.PageVo;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +35,22 @@ import com.atguigu.gmall.pms.service.AttrAttrgroupRelationService;
 public class AttrAttrgroupRelationController {
     @Autowired
     private AttrAttrgroupRelationService attrAttrgroupRelationService;
+
+
+    /**
+     * 删除关联关系
+     */
+    // 明天可以研究下各种格式的请求用什么注解来接收，同时各种注解之间的区别
+    @PostMapping("/delete/attr")
+    public Resp<String> deleteGroupAttrRelation(@RequestBody List<AttrAttrgroupRelationEntity> relationEntity) {
+        QueryWrapper wrapper = new QueryWrapper();
+        wrapper.eq("attr_group_id", relationEntity.get(0).getAttrGroupId());
+        wrapper.eq("attr_id", relationEntity.get(0).getAttrId());
+        if (attrAttrgroupRelationService.remove(wrapper)) {
+            return Resp.ok("删除成功");
+        }
+        return Resp.ok("删除失败");
+    }
 
     /**
      * 列表

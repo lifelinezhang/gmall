@@ -1,5 +1,10 @@
 package com.atguigu.gmall.pms.service.impl;
 
+import com.atguigu.gmall.pms.entity.AttrAttrgroupRelationEntity;
+import com.atguigu.gmall.pms.service.AttrAttrgroupRelationService;
+import com.atguigu.gmall.pms.vo.AttrIncloudGroupEntity;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.Map;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -16,6 +21,10 @@ import com.atguigu.gmall.pms.service.AttrService;
 
 @Service("attrService")
 public class AttrServiceImpl extends ServiceImpl<AttrDao, AttrEntity> implements AttrService {
+
+    @Autowired
+    private AttrAttrgroupRelationService relationService;
+
 
     @Override
     public PageVo queryPage(QueryCondition params) {
@@ -37,6 +46,19 @@ public class AttrServiceImpl extends ServiceImpl<AttrDao, AttrEntity> implements
                 attrEntityQueryWrapper
         );
         return new PageVo(page);
+    }
+
+    @Override
+    public boolean saveAttr(AttrIncloudGroupEntity attr) {
+        AttrEntity attrEntity = new AttrEntity();
+        BeanUtils.copyProperties(attr, attrEntity);
+        boolean flag1 = this.save(attrEntity);
+        attrEntity.getAttrId();
+        AttrAttrgroupRelationEntity relationEntity = new AttrAttrgroupRelationEntity();
+        BeanUtils.copyProperties(attr, relationEntity);
+        relationEntity.setAttrId(attrEntity.getAttrId());
+        boolean flag2 = relationService.save(relationEntity);
+        return flag1 && flag2;
     }
 
 }
