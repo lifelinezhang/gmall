@@ -8,6 +8,7 @@ import com.atguigu.core.bean.PageVo;
 import com.atguigu.core.bean.Query;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
+import com.atguigu.gmall.pms.vo.SpuInfoVo;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.annotations.Api;
@@ -36,11 +37,16 @@ public class SpuInfoController {
     @Autowired
     private SpuInfoService spuInfoService;
 
+
+
+
+
     /**
      * 查询
      */
     @GetMapping
     public Resp<PageVo> querySpuPage(QueryCondition queryCondition, @RequestParam("catId") Long catId) {
+        System.out.println(queryCondition.toString() + "  " + catId);
         PageVo pageVo = spuInfoService.querySpuPage(queryCondition, catId);
         return Resp.ok(pageVo);
 
@@ -76,9 +82,8 @@ public class SpuInfoController {
     @ApiOperation("保存")
     @PostMapping("/save")
     @PreAuthorize("hasAuthority('pms:spuinfo:save')")
-    public Resp<Object> save(@RequestBody SpuInfoEntity spuInfo){
-		spuInfoService.save(spuInfo);
-
+    public Resp<Object> save(@RequestBody SpuInfoVo spuInfoVo){
+		spuInfoService.bigSave(spuInfoVo);
         return Resp.ok(null);
     }
 

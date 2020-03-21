@@ -1,12 +1,12 @@
 package com.atguigu.gmall.sms.controller;
 
 import java.util.Arrays;
-import java.util.Map;
 
 
 import com.atguigu.core.bean.PageVo;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
+import com.atguigu.gmall.sms.vo.SkuSaleVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +32,15 @@ import com.atguigu.gmall.sms.service.SkuBoundsService;
 public class SkuBoundsController {
     @Autowired
     private SkuBoundsService skuBoundsService;
+
+    /**
+     * 保存从pms传过来的营销相关的信息
+     */
+    @PostMapping("/sku/sale/save")
+    public Resp<Object> saveSale(@RequestBody SkuSaleVo skuSaleVo) {
+        skuBoundsService.saveSale(skuSaleVo);
+        return Resp.ok(null);
+    }
 
     /**
      * 列表

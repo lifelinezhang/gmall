@@ -10,6 +10,7 @@ import com.atguigu.gmall.pms.entity.AttrAttrgroupRelationEntity;
 import com.atguigu.gmall.pms.entity.AttrEntity;
 import com.atguigu.gmall.pms.entity.AttrGroupEntity;
 import com.atguigu.gmall.pms.service.AttrGroupService;
+import com.atguigu.gmall.pms.vo.AttrAndGroupEntity;
 import com.atguigu.gmall.pms.vo.GroupVo;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -33,6 +34,9 @@ public class AttrGroupServiceImpl extends ServiceImpl<AttrGroupDao, AttrGroupEnt
     @Autowired
     private AttrDao attrDao;
 
+    @Autowired
+    private AttrAttrgroupRelationDao attrAttrgroupRelationDao;
+
     @Override
     public PageVo queryPage(QueryCondition params) {
         IPage<AttrGroupEntity> page = this.page(
@@ -43,6 +47,13 @@ public class AttrGroupServiceImpl extends ServiceImpl<AttrGroupDao, AttrGroupEnt
         return new PageVo(page);
     }
 
+    /**
+     * Resp是我们自己封装的类，用于返回结果数据，对结果数据进行格式上的统一
+     * PageVo也是我们自己封装的类，用于对查询的分页数据进行格式上的统一，传入的参数可以是list，也可以是Ipage
+     * Ipage是mybatis-plus提供的分页查询结果类， 穿进去的参数包括一个Page类(IPage的实现类)，和一个QueryWrapper类（可选），
+     * Query也是我们自己封装的类，用于对分页条件进行封装，同时过滤掉sql注入
+     * 其中Page类用于进行条数和页数的限制，QueryWrapper类用于限制查询条件
+     */
     @Override
     public PageVo queryGroupByPage(QueryCondition params, Integer catId) {
         QueryWrapper<AttrGroupEntity> queryWrapper = new QueryWrapper<AttrGroupEntity>();
@@ -74,6 +85,37 @@ public class AttrGroupServiceImpl extends ServiceImpl<AttrGroupDao, AttrGroupEnt
         List<AttrEntity> attrEntities = attrDao.selectBatchIds(attrIds);
         groupVo.setAttrEntities(attrEntities);
         return groupVo;
+    }
+
+    @Override
+    public List<GroupVo> queryGroupAndAttrsByCatId(Long catId) {
+        List<AttrAndGroupEntity> respList = new ArrayList<>();
+        // 先根据catid查询组名
+        QueryWrapper<AttrGroupEntity> wrapper = new  QueryWrapper<AttrGroupEntity>();
+        wrapper.eq("catelog_id", catId);
+        List<AttrGroupEntity> list = this.list(wrapper);
+//        for (int i = 0; i < list.size() ; i++) {
+//            AttrAndGroupEntity attrAndGroupEntity = new AttrAndGroupEntity();
+//            BeanUtils.copyProperties(list.get(i), attrAndGroupEntity);
+//            respList.add(attrAndGroupEntity);
+//        }
+//        // 根据组名查询每个组对应的属性id有哪些
+//        for(int i = 0; i < respList.size() ; i++) {
+//            AttrAndGroupEntity attrAndGroupEntity = respList.get(i);
+//            QueryWrapper<AttrAttrgroupRelationEntity> wrapper2 = new  QueryWrapper<AttrAttrgroupRelationEntity>();
+//            wrapper2.eq("attr_group_id", attrAndGroupEntity.getAttrGroupId());
+//            List<AttrAttrgroupRelationEntity> relationEntities = attrAttrgroupRelationDao.selectList(wrapper2);
+//            // 根据拿到的属性id查询属性
+//            for (int j = 0; j < relationEntities.size(); j++) {
+//                AttrEntity attrEntity = new AttrEntity();
+//                QueryWrapper<AttrEntity> wrapper3 = new  QueryWrapper<AttrEntity>();
+//                wrapper3.eq("attr_id", relationEntities.get(j).getAttrId());
+//                List<AttrEntity> attrEntities = attrDao.selectList(wrapper3);
+//                attrAndGroupEntity.setAttrEntities(attrEntities);
+//            }
+//        }
+//        return respList;
+        return list.stream().map(attrGroupEntity -> this.queryGroupWithAttrsByGid(attrGroupEntity.getAttrGroupId())).collect(Collectors.toList());
     }
 
 
