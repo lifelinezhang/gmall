@@ -4,13 +4,12 @@ import com.atguigu.gmall.pms.dao.SkuInfoDao;
 import com.atguigu.gmall.pms.dao.SpuInfoDescDao;
 import com.atguigu.gmall.pms.entity.*;
 import com.atguigu.gmall.pms.feign.GmallSmsClient;
-import com.atguigu.gmall.pms.service.ProductAttrValueService;
-import com.atguigu.gmall.pms.service.SkuImagesService;
-import com.atguigu.gmall.pms.service.SkuSaleAttrValueService;
+import com.atguigu.gmall.pms.service.*;
 import com.atguigu.gmall.pms.vo.BaseAttrVo;
 import com.atguigu.gmall.pms.vo.SkuInfoVo;
 import com.atguigu.gmall.pms.vo.SpuInfoVo;
 import com.atguigu.gmall.sms.vo.SkuSaleVo;
+import com.mysql.cj.util.TimeUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +22,17 @@ import com.atguigu.core.bean.Query;
 import com.atguigu.core.bean.QueryCondition;
 
 import com.atguigu.gmall.pms.dao.SpuInfoDao;
-import com.atguigu.gmall.pms.service.SpuInfoService;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -52,6 +56,9 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
 
     @Autowired
     private GmallSmsClient gmallSmsClient;
+
+    @Autowired
+    private SpuInfoDescService spuInfoDescService;
 
     @Override
     public PageVo queryPage(QueryCondition params) {
@@ -81,33 +88,41 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
     }
 
     // 大保存方法
+
+    /**
+     * 事务隔离级别、传播行为分别对应Transactional注解里面的Isolation和Propagation
+     * 回滚策略对应：
+     *     noRollbackForClassName/noRollbackFor: 发生什么异常不回滚（运行时异常都会回滚）
+     *     rollbackFor:   发生什么异常回滚（编译时异常都不回滚）
+     *     timeout:       超时回滚（单位为秒）
+     *     readonly:      只读事务(只能查询，不能增删改)
+     * @param spuInfoVo
+     */
     @Override
-    public void bigSave(SpuInfoVo spuInfoVo) {
+    @Transactional(readOnly = true)
+    public void bigSave(SpuInfoVo spuInfoVo) throws FileNotFoundException {
         // 1、保存spu相关的3张表
         // 1.1、 保存pms_spu_info信息
-        spuInfoVo.setCreateTime(new Date());
-        spuInfoVo.setUodateTime(spuInfoVo.getCreateTime());
-        this.save(spuInfoVo);
-        Long spuId = spuInfoVo.getId();
+        Long spuId = saveSpuInfo(spuInfoVo);
         // 1.2、 保存pms_spu_info_desc信息
-        List<String> spuImages = spuInfoVo.getSpuImages();
-        if(!CollectionUtils.isEmpty(spuImages)) {
-            SpuInfoDescEntity descEntity = new SpuInfoDescEntity();
-            descEntity.setSpuId(spuId);
-            descEntity.setDecript(StringUtils.join(spuImages, ","));
-            this.spuInfoDescDao.insert(descEntity);
+        spuInfoDescService.saveSpuInfoDesc(spuInfoVo, spuId);
+
+        try {
+            TimeUnit.SECONDS.sleep(4);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
+
+//        new FileInputStream((new File("xxxx")));
+//        int i = 1 / 0;
         // 1.3、 保存pms_product_attr_value信息
-        List<BaseAttrVo> baseAttrs = spuInfoVo.getBaseAttrs();
-        if(!CollectionUtils.isEmpty(baseAttrs)) {
-            List<ProductAttrValueEntity> collect = baseAttrs.stream().map(baseAttrVo -> {
-                ProductAttrValueEntity attrValueEntity = baseAttrVo;
-                attrValueEntity.setSpuId(spuId);
-                return attrValueEntity;
-            }).collect(Collectors.toList());
-            attrValueService.saveBatch(collect);
-        }
-        // 2、保存sku相关的3张表
+        saveBaseAttrValue(spuInfoVo, spuId);
+        // 2、保存sku相关的3张表和营销信息相关的三张表
+        saveSkuAndSale(spuInfoVo, spuId);
+    }
+
+
+    private void saveSkuAndSale(SpuInfoVo spuInfoVo, Long spuId) {
         List<SkuInfoVo> skus = spuInfoVo.getSkus();
         if(CollectionUtils.isEmpty(skus)) {
             return;
@@ -156,4 +171,121 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
         });
     }
 
+    private void saveBaseAttrValue(SpuInfoVo spuInfoVo, Long spuId) {
+        List<BaseAttrVo> baseAttrs = spuInfoVo.getBaseAttrs();
+        if(!CollectionUtils.isEmpty(baseAttrs)) {
+            List<ProductAttrValueEntity> collect = baseAttrs.stream().map(baseAttrVo -> {
+                ProductAttrValueEntity attrValueEntity = baseAttrVo;
+                attrValueEntity.setSpuId(spuId);
+                return attrValueEntity;
+            }).collect(Collectors.toList());
+            attrValueService.saveBatch(collect);
+        }
+    }
+
+
+
+    private Long saveSpuInfo(SpuInfoVo spuInfoVo) {
+        spuInfoVo.setCreateTime(new Date());
+        spuInfoVo.setUodateTime(spuInfoVo.getCreateTime());
+        this.save(spuInfoVo);
+        return spuInfoVo.getId();
+    }
+
 }
+
+
+/**
+ 注： 要演示事务的传播行为，则子事务需要在不同的sercice中，同时主方法和内部调用方法上都必须加上事务注解；
+ 在同一个service中也可以使用事务，条件是需要使用代理对象去调用子方法
+ 大保存方法测试数据：
+ {
+ "spuName": "一加7 pro",
+ "brandId": 6,
+ "catalogId": 225,
+ "publishStatus": 1,
+ "spuDescription": "垃圾手机也很好",
+ "spuImages": ["https://ggmall.oss-cn-shanghai.aliyuncs.com/2020-03-21/d5f8d9bd-6a38-4b60-8b95-d9b69de50f18_download.jpg"],
+ "baseAttrs": [{
+ "attrId": 25,
+ "attrName": "大萨达222",
+ "valueSelected": ["23231"]
+ }, {
+ "attrId": 41,
+ "attrName": "摄像头数量",
+ "valueSelected": ["2"]
+ }, {
+ "attrId": 33,
+ "attrName": "电池",
+ "valueSelected": ["4000"]
+ }, {
+ "attrId": 34,
+ "attrName": "屏幕",
+ "valueSelected": ["7"]
+ }],
+ "skus": [{
+ "attr_24": "8g",
+ "price": "4899",
+ "stock": 0,
+ "growBounds": "200",
+ "buyBounds": "500",
+ "work": [0, 1, 1, 0],
+ "fullCount": "2",
+ "discount": "90",
+ "fullPrice": "1000",
+ "reducePrice": "10",
+ "fullAddOther": 1,
+ "images": ["https://ggmall.oss-cn-shanghai.aliyuncs.com/2020-03-21/e66d124c-84db-40c7-891b-efa0340c610b_download.jpg"],
+ "skuName": "一加7 pro 8g,黑色,256",
+ "skuDesc": "一加7 pro 8g,黑色,256 xxxx",
+ "skuTitle": "【现货速发】一加 OnePlus 7 Pro 游戏手机 星雾蓝 8G+256G全网通【明星单品】",
+ "skuSubtitle": "【现货速发+京东物流】限量抢购！赠运费险+全国联保一加7Tpro限量抢购！",
+ "weight": "200",
+ "attr_30": "黑色",
+ "attr_35": "256",
+ "ladderAddOther": 1,
+ "saleAttrs": [{
+ "attrId": "24",
+ "attrValue": "8g"
+ }, {
+ "attrId": "30",
+ "attrValue": "黑色"
+ }, {
+ "attrId": "35",
+ "attrValue": "256"
+ }]
+ }, {
+ "attr_24": "8g",
+ "price": "3899",
+ "stock": 0,
+ "growBounds": "200",
+ "buyBounds": "600",
+ "work": [1, 0, 0, 1],
+ "fullCount": "3",
+ "discount": "80",
+ "fullPrice": "2000",
+ "reducePrice": "500",
+ "fullAddOther": 1,
+ "images": ["https://ggmall.oss-cn-shanghai.aliyuncs.com/2020-03-21/19997cb9-596d-4606-883d-a0e394a367d0_download.jpg"],
+ "skuName": "一加7 pro 8g,黑色,128g",
+ "skuDesc": "阿斯顿发士大夫撒地方",
+ "skuTitle": "【现货速发】一加 OnePlus 7 Pro 游戏手机 曜岩灰 8G+256G全网通【明星单品】",
+ "skuSubtitle": "【现货速发+京东物流】限量抢购！赠运费险+全国联保一加7Tpro限量抢购！",
+ "weight": "300",
+ "attr_30": "黑色",
+ "attr_35": "128g",
+ "ladderAddOther": 1,
+ "saleAttrs": [{
+ "attrId": "24",
+ "attrValue": "8g"
+ }, {
+ "attrId": "30",
+ "attrValue": "黑色"
+ }, {
+ "attrId": "35",
+ "attrValue": "128g"
+ }]
+ }]
+ }
+
+ */
