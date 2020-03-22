@@ -34,7 +34,7 @@ public class SpuInfoDescServiceImpl extends ServiceImpl<SpuInfoDescDao, SpuInfoD
         return new PageVo(page);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+//    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveSpuInfoDesc(SpuInfoVo spuInfoVo, Long spuId) {
         List<String> spuImages = spuInfoVo.getSpuImages();
         if(!CollectionUtils.isEmpty(spuImages)) {

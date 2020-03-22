@@ -90,16 +90,24 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
     // 大保存方法
 
     /**
-     * 事务隔离级别、传播行为分别对应Transactional注解里面的Isolation和Propagation
+     * 本地事务是基于关系型数据库底层事务的支持的，本质是数据库事务；
+     * 本地事务隔离级别、传播行为分别对应Transactional注解里面的Isolation和Propagation
      * 回滚策略对应：
      *     noRollbackForClassName/noRollbackFor: 发生什么异常不回滚（运行时异常都会回滚）
      *     rollbackFor:   发生什么异常回滚（编译时异常都不回滚）
      *     timeout:       超时回滚（单位为秒）
      *     readonly:      只读事务(只能查询，不能增删改)
      * @param spuInfoVo
+     * 分布式事务概念：一次大的操作由不同的小操作组成，这些小的操作分布在不同的服务器上，且属于
+     * 不同的应用，分布式事务需要保证这些小操作要么全部成功，要么全部失败
+     * 分布式事务场景：
+     *    1、不同微服务，相同数据库
+     *    2、同一工程，不同数据库（因为本地事务本质上是基于同一个数据库的）
+     *    3、不同微服务，不同数据库
+     *  本地事务的基础理论是acid，而分布式事务的基础理论就是cap和base
      */
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void bigSave(SpuInfoVo spuInfoVo) throws FileNotFoundException {
         // 1、保存spu相关的3张表
         // 1.1、 保存pms_spu_info信息
@@ -107,18 +115,24 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
         // 1.2、 保存pms_spu_info_desc信息
         spuInfoDescService.saveSpuInfoDesc(spuInfoVo, spuId);
 
-        try {
-            TimeUnit.SECONDS.sleep(4);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
+        // 测试超时事务
+//        try {
+//            TimeUnit.SECONDS.sleep(4);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//        spuInfoDescService.saveSpuInfoDesc方法中设置有自己的事务，下面这两个是为了测试本地事务的传播
 //        new FileInputStream((new File("xxxx")));
-//        int i = 1 / 0;
+//        int i = 1 / 0;  saveSpuInfoDes
         // 1.3、 保存pms_product_attr_value信息
         saveBaseAttrValue(spuInfoVo, spuId);
         // 2、保存sku相关的3张表和营销信息相关的三张表
         saveSkuAndSale(spuInfoVo, spuId);
+
+        //测试分布式事务
+        //因为saveSkuAndSale里面调用了sms服务里面的方法，所以此时观测下面这个报错之后sms里面事务的行为
+        //则可以观测分布式事务；如果是在sms中报错，则直接全部回滚。所以演示的时候需要在外部而不是在feign调用的方法里面设置异常
+        int i = 1 / 0;  // 经测试，此时pms中的全部回滚，但是sms中的数据却保存进去了，本地事务失效
     }
 
 
