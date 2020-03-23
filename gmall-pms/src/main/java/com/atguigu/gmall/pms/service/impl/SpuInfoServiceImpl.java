@@ -10,6 +10,7 @@ import com.atguigu.gmall.pms.vo.SkuInfoVo;
 import com.atguigu.gmall.pms.vo.SpuInfoVo;
 import com.atguigu.gmall.sms.vo.SkuSaleVo;
 import com.mysql.cj.util.TimeUtil;
+import io.seata.spring.annotation.GlobalTransactional;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -105,9 +106,14 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
      *    2、同一工程，不同数据库（因为本地事务本质上是基于同一个数据库的）
      *    3、不同微服务，不同数据库
      *  本地事务的基础理论是acid，而分布式事务的基础理论就是cap和base
+     *
+     */
+    /**
+     * seata建议所有的表都要有主键，否则会报错：
+     * java.sql.SQLException: Failed to fetch schema of pms_spu_info_desc
      */
     @Override
-    @Transactional
+    @GlobalTransactional
     public void bigSave(SpuInfoVo spuInfoVo) throws FileNotFoundException {
         // 1、保存spu相关的3张表
         // 1.1、 保存pms_spu_info信息
