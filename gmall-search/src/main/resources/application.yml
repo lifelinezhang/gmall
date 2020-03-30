@@ -10,3 +10,5 @@ spring:
       uris: http://121.89.194.207:9200
   application:
     name: search-service
+  jackson:
+    default-property-inclusion: non_null

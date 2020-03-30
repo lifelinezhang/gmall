@@ -1,25 +1,44 @@
 package com.atguigu.gmall.search.service;
 
+import com.atguigu.gmall.search.pojo.Goods;
 import com.atguigu.gmall.search.pojo.SearchParam;
+import com.atguigu.gmall.search.pojo.SearchResponseAttrVO;
+import com.atguigu.gmall.search.pojo.SearchResponseVO;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.text.Text;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.Operator;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.nested.ParsedNested;
+import org.elasticsearch.search.aggregations.bucket.terms.*;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class SearchService {
@@ -27,12 +46,110 @@ public class SearchService {
     @Autowired
     private RestHighLevelClient restHighLevelClient;
 
-    public void search(SearchParam searchParam) throws IOException {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+
+    public SearchResponseVO search(SearchParam searchParam) throws IOException {
         // 构建DSL语句
         SearchRequest searchRequest = this.buildQueryDsl(searchParam);
         SearchResponse response = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
         System.out.println(response);
+        SearchResponseVO responseVO = this.parseSearchResult(response);
+        responseVO.setPageSize(searchParam.getPageSize());
+        responseVO.setPageNum(searchParam.getPageNum());
+        return responseVO;
     }
+
+    private SearchResponseVO parseSearchResult(SearchResponse response) throws JsonProcessingException {
+        SearchResponseVO responseVO = new SearchResponseVO();
+        // 1、获取命中的总记录数
+        SearchHits hits = response.getHits();
+        responseVO.setTotal(hits.totalHits);
+        // 2、解析品牌的聚合结果集
+        // [{id:100,name:华为,logo:xxx},{id:101,name:小米,log:yyy}]
+        SearchResponseAttrVO brand = new SearchResponseAttrVO();
+        brand.setName("品牌");
+        // 获取品牌的聚合结果集
+        Map<String, Aggregation> aggregationMap = response.getAggregations().asMap();
+        ParsedLongTerms brandIdAgg = (ParsedLongTerms) aggregationMap.get("brandIdAgg");
+        List<String> brandValues = brandIdAgg.getBuckets().stream().map(bucket -> {
+            Map<String, String> map = new HashMap<>();
+            // 获取品牌id
+            map.put("id", bucket.getKeyAsString());
+            // 获取品牌名称：通过子聚合来获取
+            Map<String, Aggregation> brandIdSubMap = bucket.getAggregations().asMap();
+            ParsedStringTerms brandNameAgg = (ParsedStringTerms) brandIdSubMap.get("brandNameAgg");
+            String brandName = brandNameAgg.getBuckets().get(0).getKeyAsString();
+            map.put("name", brandName);
+            try {
+                return objectMapper.writeValueAsString(map);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }).collect(Collectors.toList());
+        brand.setValue(brandValues);
+        responseVO.setBrand(brand);
+        // 3、解析分类的聚合结果集
+        // [{id:100,name:华为,logo:xxx},{id:101,name:小米,log:yyy}]
+        SearchResponseAttrVO category = new SearchResponseAttrVO();
+        category.setName("分类");
+        // 获取分类的聚合结果集
+        ParsedLongTerms categoryIdAgg = (ParsedLongTerms) aggregationMap.get("categoryIdAgg");
+        List<String> catValues = categoryIdAgg.getBuckets().stream().map(bucket -> {
+            Map<String, String> map = new HashMap<>();
+            // 获取品牌id
+            map.put("id", bucket.getKeyAsString());
+            // 获取品牌名称：通过子聚合来获取
+            Map<String, Aggregation> categoryIdSubMap = bucket.getAggregations().asMap();
+            ParsedStringTerms categoryNameAgg = (ParsedStringTerms) categoryIdSubMap.get("categoryNameAgg");
+            String categoryName = categoryNameAgg.getBuckets().get(0).getKeyAsString();
+            map.put("name", categoryName);
+            try {
+                return objectMapper.writeValueAsString(map);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }).collect(Collectors.toList());
+        category.setValue(catValues);
+        responseVO.setCatelog(category);
+        // 4、解析查询列表
+        SearchHit[] subHits = hits.getHits();
+        List<Goods> goodsList = new ArrayList<>();
+        for (SearchHit subHit : subHits) {
+            Goods goods = objectMapper.readValue(subHit.getSourceAsString(), new TypeReference<Goods>() {
+            });
+            goods.setTitle(subHit.getHighlightFields().get("title").getFragments()[0].toString());
+            goodsList.add(goods);
+        }
+        responseVO.setProducts(goodsList);
+        // 5、规格参数
+        // 获取嵌套聚合对象
+        ParsedNested attrAgg = (ParsedNested) aggregationMap.get("attrAgg");
+        // 规格参数id聚合对象
+        ParsedLongTerms attrIdAgg = (ParsedLongTerms) attrAgg.getAggregations().get("attrIdAgg");
+        List<Terms.Bucket> buckets = (List<Terms.Bucket>)attrIdAgg.getBuckets();
+        if(!CollectionUtils.isEmpty(buckets)) {
+            List<SearchResponseAttrVO> searchResponseAttrVOS = buckets.stream().map(bucket -> {
+                SearchResponseAttrVO responseAttrVO = new SearchResponseAttrVO();
+                // 设置规格参数的id
+                responseAttrVO.setProductAttributeId(bucket.getKeyAsNumber().longValue());
+                // 设置规格参数的名称：获取子聚合，从子聚合中获取名称
+                List<? extends Terms.Bucket> nameBuckets = ((ParsedStringTerms) bucket.getAggregations().get("attrNameAgg")).getBuckets();
+                responseAttrVO.setName(nameBuckets.get(0).getKeyAsString());
+                // 设置规格参数值得列表
+                List<? extends Terms.Bucket> valueBuckets = ((ParsedStringTerms) bucket.getAggregations().get("attrValueAgg")).getBuckets();
+                List<String> values = valueBuckets.stream().map(Terms.Bucket::getKeyAsString).collect(Collectors.toList());
+                responseAttrVO.setValue(values);
+                return responseAttrVO;
+            }).collect(Collectors.toList());
+            responseVO.setAttrs(searchResponseAttrVOS);
+        }
+        return responseVO;
+    }
+
+
 
     private SearchRequest buildQueryDsl(SearchParam searchParam) {
         // 获取关键字
@@ -127,6 +244,8 @@ public class SearchService {
             .subAggregation(AggregationBuilders.terms("attrNameAgg").field("attrs.attrName"))
             .subAggregation(AggregationBuilders.terms("attrValueAgg").field("attrs.attrValue"))));
         System.out.println(sourceBuilder.toString());
+        // 6、结果集过滤
+        sourceBuilder.fetchSource(new String[]{"skuId", "pic", "title", "price"}, null);
         // 查询参数
         SearchRequest searchRequest = new SearchRequest("goods");
         searchRequest.types("info");
