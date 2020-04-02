@@ -12,8 +12,10 @@ import com.atguigu.gmall.sms.vo.SkuSaleVo;
 import com.mysql.cj.util.TimeUtil;
 import io.seata.spring.annotation.GlobalTransactional;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -60,6 +62,12 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
 
     @Autowired
     private SpuInfoDescService spuInfoDescService;
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
+
+    @Value("${item.rabbitmq.exchange}")
+    private String EXCHANGENAME;
 
     @Override
     public PageVo queryPage(QueryCondition params) {
@@ -138,8 +146,17 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
         //测试分布式事务
         //因为saveSkuAndSale里面调用了sms服务里面的方法，所以此时观测下面这个报错之后sms里面事务的行为
         //则可以观测分布式事务；如果是在sms中报错，则直接全部回滚。所以演示的时候需要在外部而不是在feign调用的方法里面设置异常
-        int i = 1 / 0;  // 经测试，此时pms中的全部回滚，但是sms中的数据却保存进去了，本地事务失效
+        //int i = 1 / 0;  // 经测试，此时pms中的全部回滚，但是sms中的数据却保存进去了，本地事务失效
+
+        this.sendMsg("insert", spuId);
     }
+
+    // 将增删改的信息发送给消息队列
+    private void sendMsg(String type, Long spuId) {
+        amqpTemplate.convertAndSend(EXCHANGENAME, "item." + type, spuId);
+    }
+
+
 
 
     private void saveSkuAndSale(SpuInfoVo spuInfoVo, Long spuId) {

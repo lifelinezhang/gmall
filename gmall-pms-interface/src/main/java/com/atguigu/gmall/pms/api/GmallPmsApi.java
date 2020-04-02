@@ -17,6 +17,9 @@ public interface GmallPmsApi {
     @GetMapping("pms/spuinfo/page")
     public Resp<List<SpuInfoEntity>> querySpusByPage(QueryCondition queryCondition);
 
+    @GetMapping("pms/spuinfo/info/{id}")
+    public Resp<SpuInfoEntity> querySpuById(@PathVariable("id") Long id);
+
     // 根据spuId查询spu下的sku
     @GetMapping("pms/skuinfo/{spuId}")
     public Resp<List<SkuInfoEntity>> querySkusBySpuId(@PathVariable("spuId")Long spuId);

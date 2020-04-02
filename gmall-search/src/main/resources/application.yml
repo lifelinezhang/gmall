@@ -12,3 +12,9 @@ spring:
     name: search-service
   jackson:
     default-property-inclusion: non_null
+  rabbitmq:
+    host: 121.89.194.207
+    port: 5672
+    virtual-host: /lifeline
+    username: lifeline
+    password: 41312019
