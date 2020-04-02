@@ -49,6 +49,12 @@ public class SearchService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
 
+    /**
+     * localhost:8086/search?catelog3=225&brand=6&props=33:4000-3000&order=2:asc&priceFrom=100&priceTo=10000&pageNum=1&pageSize=1&keyword=手机
+     * @param searchParam
+     * @return
+     * @throws IOException
+     */
     public SearchResponseVO search(SearchParam searchParam) throws IOException {
         // 构建DSL语句
         SearchRequest searchRequest = this.buildQueryDsl(searchParam);
