@@ -4,9 +4,11 @@ import com.atguigu.core.bean.PageVo;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
 import com.atguigu.gmall.pms.entity.*;
+import com.atguigu.gmall.pms.vo.CategoryVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -35,4 +37,11 @@ public interface GmallPmsApi {
     // 根据spuid查询该商品对应的搜索属性及值
     @GetMapping("pms/productattrvalue/{spuId}")
     public Resp<List<ProductAttrValueEntity>> querySearchAttrValueBySpuId(@PathVariable("spuId") Long spuId);
+
+    @GetMapping("pms/category")
+    public Resp<List<CategoryEntity>> getCatagoriesByPidOrLevel(@RequestParam(value = "level", defaultValue = "0") Integer level,
+                                                                @RequestParam(value = "parentCid", required = false) Long parentCid);
+
+    @GetMapping("pms/category/{pid}")
+    public Resp<List<CategoryVo>> querySubCategories(@PathVariable("pid")Long pid);
 }
