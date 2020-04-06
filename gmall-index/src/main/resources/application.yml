@@ -6,4 +6,4 @@ spring:
       discovery:
         server-addr: 127.0.0.1
   redis:
-    host: 121.89.194.207
+    host: 192.168.2.102

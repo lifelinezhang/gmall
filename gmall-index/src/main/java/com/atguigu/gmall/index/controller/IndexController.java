@@ -26,8 +26,34 @@ public class IndexController {
     }
 
     @GetMapping("/cates/{pid}")
-    public Resp<List<CategoryVo>> querySubCategories(@PathVariable("pid")Long pid) {
+    public Resp<List<CategoryVo>> querySubCategories(@PathVariable("pid") Long pid) {
         List<CategoryVo> categoryVos = indexService.querySubCategories(pid);
         return Resp.ok(categoryVos);
+    }
+
+    @GetMapping("test/lock")
+    public String testLock() {
+        indexService.testLock();
+        return "ok";
+    }
+
+    @GetMapping("test/read")
+    public String testRead() {
+        return this.indexService.testRead();
+    }
+
+    @GetMapping("test/write")
+    public String testWrite() {
+        return this.indexService.testWrite();
+    }
+
+    @GetMapping("test/latch")
+    public String testLatch() throws InterruptedException {
+        return this.indexService.testLatch();
+    }
+
+    @GetMapping("test/countdown")
+    public String testCountdown() {
+        return this.indexService.testCountdown();
     }
 }
