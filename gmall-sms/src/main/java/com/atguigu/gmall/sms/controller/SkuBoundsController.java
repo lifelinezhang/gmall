@@ -1,11 +1,11 @@
 package com.atguigu.gmall.sms.controller;
 
-import java.util.Arrays;
-
-
 import com.atguigu.core.bean.PageVo;
 import com.atguigu.core.bean.QueryCondition;
 import com.atguigu.core.bean.Resp;
+import com.atguigu.gmall.sms.entity.SkuBoundsEntity;
+import com.atguigu.gmall.sms.service.SkuBoundsService;
+import com.atguigu.gmall.sms.vo.SaleVo;
 import com.atguigu.gmall.sms.vo.SkuSaleVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -13,10 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import com.atguigu.gmall.sms.entity.SkuBoundsEntity;
-import com.atguigu.gmall.sms.service.SkuBoundsService;
-
-
+import java.util.Arrays;
+import java.util.List;
 
 
 /**
@@ -33,10 +31,21 @@ public class SkuBoundsController {
     @Autowired
     private SkuBoundsService skuBoundsService;
 
+
+    /**
+     * 查询营销信息
+     */
+    @GetMapping("{skuId}")
+    public Resp<List<SaleVo>> querySalesBySkuId(@PathVariable("skuId") Long skuId) {
+        List<SaleVo> saleVos = this.skuBoundsService.querySalesBySkuId(skuId);
+        return Resp.ok(saleVos);
+    }
+
     /**
      * 保存从pms传过来的营销相关的信息
      */
     @PostMapping("/sku/sale/save")
+
     public Resp<Object> saveSale(@RequestBody SkuSaleVo skuSaleVo) {
         skuBoundsService.saveSale(skuSaleVo);
         return Resp.ok(null);
