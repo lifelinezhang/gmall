@@ -59,4 +59,6 @@ public interface GmallPmsApi {
     @GetMapping("pms/attrgroup/item/group/{cid}/{spuId}")
     public Resp<List<ItemGroupVo>> queryItemGroupVoByCidAndSpuId(@PathVariable("cid") Long cid, @PathVariable("spuId") Long spuId);
 
+    @GetMapping("pms/skusaleattrvalue/sku/{skuId}")
+    public Resp<List<SkuSaleAttrValueEntity>> querySkuSalesAttrValuesBySkuId(@PathVariable("skuId") Long skuId);
 }

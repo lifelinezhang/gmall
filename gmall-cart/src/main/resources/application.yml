@@ -10,3 +10,14 @@ spring:
         server-addr: 127.0.0.1:8848
   redis:
     host: 127.0.0.1
+  rabbitmq:
+    host: 121.89.194.207
+    port: 5672
+    virtual-host: /lifeline
+    username: lifeline
+    password: 41312019
+gmall:
+  jwt:
+    pubKeyPath: G:\\gmall\\rsa\\rsa.pub
+    cookieName: GMALL_TOKEN
+    userKey: user-key
