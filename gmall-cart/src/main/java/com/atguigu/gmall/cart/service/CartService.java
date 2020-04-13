@@ -2,12 +2,12 @@ package com.atguigu.gmall.cart.service;
 
 import com.alibaba.fastjson.JSON;
 import com.atguigu.core.bean.Resp;
+import com.atguigu.core.bean.UserInfo;
 import com.atguigu.gmall.cart.feign.GmallPmsClient;
 import com.atguigu.gmall.cart.feign.GmallSmsClient;
 import com.atguigu.gmall.cart.feign.GmallWmsClient;
 import com.atguigu.gmall.cart.interceptors.LoginIntercepter;
 import com.atguigu.gmall.cart.pojo.Cart;
-import com.atguigu.gmall.cart.pojo.UserInfo;
 import com.atguigu.gmall.pms.entity.SkuInfoEntity;
 import com.atguigu.gmall.pms.entity.SkuSaleAttrValueEntity;
 import com.atguigu.gmall.sms.vo.SaleVo;
@@ -170,5 +170,11 @@ public class CartService {
         if (hashOps.hasKey(skuId.toString())) {
             hashOps.delete(skuId.toString());
         }
+    }
+
+    public List<Cart> queryCheckCartsByUserId(Long userId) {
+        BoundHashOperations<String, Object, Object> hashOps = this.redisTemplate.boundHashOps(key_prefix + userId);
+        List<Object> cartJsonList = hashOps.values();
+        return cartJsonList.stream().map(cartJson -> JSON.parseObject(cartJson.toString(), Cart.class)).filter(Cart::getCheck).collect(Collectors.toList());
     }
 }
