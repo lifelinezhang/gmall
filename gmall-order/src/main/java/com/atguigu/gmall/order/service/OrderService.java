@@ -8,17 +8,22 @@ import com.atguigu.gmall.order.feign.*;
 import com.atguigu.gmall.order.interceptors.LoginIntercepter;
 import com.atguigu.gmall.order.vo.OrderConfirmVo;
 import com.atguigu.gmall.order.vo.OrderItemVo;
+import com.atguigu.gmall.order.vo.OrderSubmitVo;
 import com.atguigu.gmall.pms.entity.SkuInfoEntity;
 import com.atguigu.gmall.pms.entity.SkuSaleAttrValueEntity;
 import com.atguigu.gmall.ums.entity.MemberEntity;
 import com.atguigu.gmall.ums.entity.MemberReceiveAddressEntity;
 import com.atguigu.gmall.wms.entity.WareSkuEntity;
+import com.atguigu.gmall.wms.vo.SkuLockVo;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,6 +55,8 @@ public class OrderService {
 
     @Autowired
     private ThreadPoolExecutor threadPoolExecutor;
+
+    private static final String TOKEN_PREFIX = "order:token:";
 
     public OrderConfirmVo confirm() {
         OrderConfirmVo orderConfirmVo = new OrderConfirmVo();
@@ -122,12 +129,59 @@ public class OrderService {
 
         // 生成一个唯一标志，防止重复提交（响应到页面一份，保存到redis一份）
         CompletableFuture<Void> tokenCompletableFuture = CompletableFuture.runAsync(() -> {
-            orderConfirmVo.setOrderToken(IdWorker.getIdStr());
+            String orderToken = IdWorker.getIdStr();
+            orderConfirmVo.setOrderToken(orderToken);
+            this.redisTemplate.opsForValue().set(TOKEN_PREFIX + orderToken, orderToken);
         }, threadPoolExecutor);
 
         CompletableFuture.allOf(
                 addressCompletableFuture, bigSkuCompletableFuture, memberCompletableFuture, tokenCompletableFuture
         ).join();
         return orderConfirmVo;
+    }
+
+    public void submit(OrderSubmitVo submitVo) {
+        String orderToken = submitVo.getOrderToken();
+        // 1、 防重复提交， 查询redis中有没有orderToken的信息，有则是第一次提交，放行并删除redis中的orderToken
+        String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+        Long flag = this.redisTemplate.execute(new DefaultRedisScript<>(script, Long.class), Arrays.asList(TOKEN_PREFIX + orderToken), orderToken);
+        if (flag == 0) {
+            throw new OrderException("订单不可重复提交！");
+        }
+        // 2、校验总价格，如果总价一致则放行
+        List<OrderItemVo> items = submitVo.getItems(); // 送货清单
+        BigDecimal totalPrice = submitVo.getTotalPrice(); // 总价
+        if (CollectionUtils.isEmpty(items)) {
+            throw new OrderException("没有购买的商品，请到购物车中勾选商品");
+        }
+        // 获取实时总价信息
+        BigDecimal currentTotalPrice = items.stream().map(item -> {
+            Resp<SkuInfoEntity> skuInfoEntityResp = this.pmsClient.querySkuById(item.getSkuId());
+            SkuInfoEntity skuInfoEntity = skuInfoEntityResp.getData();
+            if (skuInfoEntity != null) {
+                return skuInfoEntity.getPrice().multiply(new BigDecimal(item.getCount()));
+            }
+            return new BigDecimal(0);
+        }).reduce((a, b) -> a.add(b)).get();
+        // 判断实时总价和页面总价格是否一致
+        if (currentTotalPrice.compareTo(totalPrice) != 0) {
+            throw new OrderException("页面已过期，请刷新页面后重新下单！");
+        }
+        // 3、校验库存是否充足并锁定库存，一次性提示所有库存不够的商品信息
+        List<SkuLockVo> lockVos = items.stream().map(item -> {
+            SkuLockVo skuLockVo = new SkuLockVo();
+            skuLockVo.setSkuId(item.getSkuId());
+            skuLockVo.setCount(item.getCount());
+            return skuLockVo;
+        }).collect(Collectors.toList());
+        Resp<Object> wareResp = this.wmsClient.checkAndLockStore(lockVos);
+        if (wareResp.getCode() != 0) {
+            throw new OrderException(wareResp.getMsg());
+        }
+
+        // 4、下单（创建订单及订单详情）
+
+        // 5、删除购物车（发送消息删除购物车）
+
     }
 }

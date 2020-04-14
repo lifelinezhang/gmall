@@ -3,7 +3,7 @@
 
 <mapper namespace="com.atguigu.gmall.wms.dao.WareSkuDao">
 
-	<!-- 可根据自己的需求，是否要使用 -->
+    <!-- 可根据自己的需求，是否要使用 -->
     <resultMap type="com.atguigu.gmall.wms.entity.WareSkuEntity" id="wareSkuMap">
         <result property="id" column="id"/>
         <result property="skuId" column="sku_id"/>
@@ -13,5 +13,28 @@
         <result property="stockLocked" column="stock_locked"/>
     </resultMap>
 
+    <select id="checkStore" resultMap="wareSkuMap">
+        SELECT
+            *
+        FROM
+            wms_ware_sku a
+        WHERE
+            a.sku_id = #{skuId}
+        AND a.stock - a.stock_locked >= #{count}
+    </select>
+
+    <update id="lockStore">
+        UPDATE wms_ware_sku
+        SET stock_locked = stock_locked + #{count}
+        WHERE
+            id = #{id}
+    </update>
+
+    <update id="unLockStore">
+        UPDATE wms_ware_sku
+        SET stock_locked = stock_locked - #{count}
+        WHERE
+            id = #{wareSkuId}
+    </update>
 
 </mapper>
