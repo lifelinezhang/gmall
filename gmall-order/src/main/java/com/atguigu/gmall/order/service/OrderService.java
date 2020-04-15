@@ -4,11 +4,12 @@ import com.atguigu.core.bean.Resp;
 import com.atguigu.core.bean.UserInfo;
 import com.atguigu.core.exception.OrderException;
 import com.atguigu.gmall.cart.pojo.Cart;
+import com.atguigu.gmall.oms.entity.OrderEntity;
+import com.atguigu.gmall.oms.vo.OrderItemVo;
+import com.atguigu.gmall.oms.vo.OrderSubmitVo;
 import com.atguigu.gmall.order.feign.*;
 import com.atguigu.gmall.order.interceptors.LoginIntercepter;
 import com.atguigu.gmall.order.vo.OrderConfirmVo;
-import com.atguigu.gmall.order.vo.OrderItemVo;
-import com.atguigu.gmall.order.vo.OrderSubmitVo;
 import com.atguigu.gmall.pms.entity.SkuInfoEntity;
 import com.atguigu.gmall.pms.entity.SkuSaleAttrValueEntity;
 import com.atguigu.gmall.ums.entity.MemberEntity;
@@ -16,6 +17,7 @@ import com.atguigu.gmall.ums.entity.MemberReceiveAddressEntity;
 import com.atguigu.gmall.wms.entity.WareSkuEntity;
 import com.atguigu.gmall.wms.vo.SkuLockVo;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -24,7 +26,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -55,6 +59,9 @@ public class OrderService {
 
     @Autowired
     private ThreadPoolExecutor threadPoolExecutor;
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
 
     private static final String TOKEN_PREFIX = "order:token:";
 
@@ -141,6 +148,8 @@ public class OrderService {
     }
 
     public void submit(OrderSubmitVo submitVo) {
+        UserInfo userInfo = LoginIntercepter.getUserInfo();
+
         String orderToken = submitVo.getOrderToken();
         // 1、 防重复提交， 查询redis中有没有orderToken的信息，有则是第一次提交，放行并删除redis中的orderToken
         String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
@@ -180,8 +189,18 @@ public class OrderService {
         }
 
         // 4、下单（创建订单及订单详情）
-
+        try {
+            submitVo.setUserId(userInfo.getId());
+            Resp<OrderEntity> orderEntityResp = this.omsClient.saveOrder(submitVo);
+            OrderEntity orderEntity = orderEntityResp.getData();
+        } catch (Exception e) {
+            throw new OrderException("服务器错误，创建订单失败");
+        }
         // 5、删除购物车（发送消息删除购物车）
-
+        Map<String, Object> map = new HashMap<>();
+        map.put("userId", userInfo.getId());
+        List<Long> skuIds = items.stream().map(OrderItemVo::getSkuId).collect(Collectors.toList());
+        map.put("skuIds", skuIds);
+        this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "cart.delete", map);
     }
 }
