@@ -4,6 +4,7 @@ import com.atguigu.gmall.wms.entity.WareSkuEntity;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -15,6 +16,7 @@ import java.util.List;
  * @date 2020-03-18 22:14:00
  */
 @Mapper
+@Component
 public interface WareSkuDao extends BaseMapper<WareSkuEntity> {
 
     List<WareSkuEntity> checkStore(@Param("skuId") Long skuId, @Param("count") Integer count);

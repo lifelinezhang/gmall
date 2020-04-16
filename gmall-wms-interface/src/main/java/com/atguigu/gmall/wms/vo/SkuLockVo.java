@@ -8,4 +8,5 @@ public class SkuLockVo {
     private Integer count;
     private Long wareSkuId; // 库存表中该商品对应的id（非skuid）
     private Boolean lock; // 商品锁定状态
+    private String orderToken; // 订单编号
 }

@@ -23,6 +23,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -51,6 +52,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
     }
 
     @Override
+    @Transactional
     public OrderEntity saveOrder(OrderSubmitVo submitVo) {
         // 1、保存订单orderentity
         // 1.1、 地址相关信息
@@ -108,6 +110,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
             itemEntity.setSpuName(spuInfoEntity.getSpuName());
             this.itemDao.insert(itemEntity);
         });
+
+//        int i = 1 / 0;
         return orderEntity;
     }
 

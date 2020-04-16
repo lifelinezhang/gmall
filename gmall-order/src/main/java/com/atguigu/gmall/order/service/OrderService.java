@@ -181,6 +181,7 @@ public class OrderService {
             SkuLockVo skuLockVo = new SkuLockVo();
             skuLockVo.setSkuId(item.getSkuId());
             skuLockVo.setCount(item.getCount());
+            skuLockVo.setOrderToken(orderToken);
             return skuLockVo;
         }).collect(Collectors.toList());
         Resp<Object> wareResp = this.wmsClient.checkAndLockStore(lockVos);
@@ -194,6 +195,10 @@ public class OrderService {
             Resp<OrderEntity> orderEntityResp = this.omsClient.saveOrder(submitVo);
             OrderEntity orderEntity = orderEntityResp.getData();
         } catch (Exception e) {
+            // 如果下单失败，则需要回滚第三步的锁定库存，这里可以使用seata，但是seata存在性能问题
+            // 这里就可以使用另一种解决方案：消息的最终一致
+            // 即发送一条消息告诉wms去解锁这个订单锁定的库存
+            this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "stock.unlock", orderToken);
             throw new OrderException("服务器错误，创建订单失败");
         }
         // 5、删除购物车（发送消息删除购物车）
