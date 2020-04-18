@@ -29,8 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -188,7 +187,7 @@ public class OrderService {
         if (wareResp.getCode() != 0) {
             throw new OrderException(wareResp.getMsg());
         }
-
+//        int i = 1 / 0;
         // 4、下单（创建订单及订单详情）
         try {
             submitVo.setUserId(userInfo.getId());
@@ -207,5 +206,15 @@ public class OrderService {
         List<Long> skuIds = items.stream().map(OrderItemVo::getSkuId).collect(Collectors.toList());
         map.put("skuIds", skuIds);
         this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "cart.delete", map);
+    }
+
+
+    public static void main(String[] args) {
+        // 定时任务
+        ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
+        scheduledExecutorService.scheduleAtFixedRate(
+                () -> {
+                    System.out.println("这是一个定时任务");
+                }, 5l, 5l, TimeUnit.SECONDS);
     }
 }

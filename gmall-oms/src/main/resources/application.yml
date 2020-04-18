@@ -12,6 +12,12 @@ spring:
     password: 41312019zhang
   redis:
     host: 127.0.0.1
+  rabbitmq:
+    host: 121.89.194.207
+    port: 5672
+    virtual-host: /lifeline
+    username: lifeline
+    password: 41312019
 mybatis-plus:
   global-config:
     db-config:

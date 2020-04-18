@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -36,6 +37,12 @@ public class WareListener {
         skuLockVos.forEach(skuLockVo -> {
             this.wareSkuDao.unLockStore(skuLockVo.getWareSkuId(), skuLockVo.getCount());
         });
+    }
+
+
+    @Scheduled(fixedDelay = 1000)
+    public void test() {
+        System.out.println("这是一个周期定时任务");
     }
 
 }

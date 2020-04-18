@@ -21,6 +21,7 @@ import com.atguigu.gmall.ums.entity.MemberReceiveAddressEntity;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
 
     @Autowired
     private OrderItemDao itemDao;
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
 
     @Override
     public PageVo queryPage(QueryCondition params) {
@@ -112,6 +116,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
         });
 
 //        int i = 1 / 0;
+        // 订单创建之后，响应之前，发送延时消息，达到定时关单的效果
+        this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "order.ttl", submitVo.getOrderToken());
         return orderEntity;
     }
 
