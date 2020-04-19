@@ -22,6 +22,7 @@ public class OrderListener {
     @Autowired
     private AmqpTemplate amqpTemplate;
 
+
     @RabbitListener(queues = {"ORDER-DEAD-QUEUE"})
     public void closeOrder(String orderToken) {
         // 如果执行了关单操作
