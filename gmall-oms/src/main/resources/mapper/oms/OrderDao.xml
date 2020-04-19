@@ -53,5 +53,9 @@
         UPDATE oms_order SET `status` = 4 where order_sn = #{orderToken} and `status` = 0
     </update>
 
+    <update id="payOrder">
+        UPDATE oms_order SET `status` = 1 where order_sn = #{orderToken} and `status` = 0
+    </update>
+
 
 </mapper>

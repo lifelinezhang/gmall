@@ -18,4 +18,6 @@ public interface OrderDao extends BaseMapper<OrderEntity> {
 
     public int closeOrder(String orderToken);
 
+    public int payOrder(String orderToken);
+
 }

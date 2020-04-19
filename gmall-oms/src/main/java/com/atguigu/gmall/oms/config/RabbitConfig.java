@@ -20,7 +20,7 @@ public class RabbitConfig {
         // 这个key是死信队列将要转发的那个交换机，往下面的队列进行转发的topic的key
         // 跟convertAndSend方法中的key是一个意思
         map.put("x-dead-letter-routing-key", "order.dead");
-        map.put("x-message-ttl", 120000);
+        map.put("x-message-ttl", 1200000);
         return new Queue("ORDER-TTL-QUEUE", true, false, false, map);
     }
 

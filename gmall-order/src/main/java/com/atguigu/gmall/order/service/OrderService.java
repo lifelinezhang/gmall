@@ -146,7 +146,7 @@ public class OrderService {
         return orderConfirmVo;
     }
 
-    public void submit(OrderSubmitVo submitVo) {
+    public OrderEntity submit(OrderSubmitVo submitVo) {
         UserInfo userInfo = LoginIntercepter.getUserInfo();
 
         String orderToken = submitVo.getOrderToken();
@@ -189,9 +189,10 @@ public class OrderService {
         }
 //        int i = 1 / 0;
         // 4、下单（创建订单及订单详情）
+        Resp<OrderEntity> orderEntityResp = null;
         try {
             submitVo.setUserId(userInfo.getId());
-            Resp<OrderEntity> orderEntityResp = this.omsClient.saveOrder(submitVo);
+            orderEntityResp = this.omsClient.saveOrder(submitVo);
             OrderEntity orderEntity = orderEntityResp.getData();
         } catch (Exception e) {
             // 如果下单失败，则需要回滚第三步的锁定库存，这里可以使用seata，但是seata存在性能问题
@@ -206,6 +207,10 @@ public class OrderService {
         List<Long> skuIds = items.stream().map(OrderItemVo::getSkuId).collect(Collectors.toList());
         map.put("skuIds", skuIds);
         this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "cart.delete", map);
+        if (orderEntityResp != null) {
+            return orderEntityResp.getData();
+        }
+        return null;
     }
 
 
