@@ -9,8 +9,15 @@ import com.atguigu.gmall.order.pay.PayAsyncVo;
 import com.atguigu.gmall.order.pay.PayVo;
 import com.atguigu.gmall.order.service.OrderService;
 import com.atguigu.gmall.order.vo.OrderConfirmVo;
+import com.atguigu.gmall.wms.vo.SkuLockVo;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RCountDownLatch;
+import org.redisson.api.RSemaphore;
+import org.redisson.api.RedissonClient;
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,6 +29,12 @@ public class OrderController {
 
     @Autowired
     private AlipayTemplate alipayTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private RedissonClient redissonClient;
 
     @Autowired
     private AmqpTemplate amqpTemplate;
@@ -59,5 +72,49 @@ public class OrderController {
         return Resp.ok(null);
     }
 
+    @PostMapping("seckill/{skuId}")
+    public Resp<Object> seckill(@PathVariable("skuId") Long skuId) {
+        RSemaphore semaphore = this.redissonClient.getSemaphore("semaphore:lock:" + skuId);
+        semaphore.trySetPermits(500);
+        if (semaphore.tryAcquire()) {
+            // 获取redis中的库存信息
+            String countString = this.redisTemplate.opsForValue().get("order:seckill:" + skuId);
+            // 没有，秒杀结束
+            if (StringUtils.isEmpty(countString) || Integer.parseInt(countString) == 0) {
+                return Resp.ok("秒杀结束");
+            }
+            // 有，减库存
+            Integer count = Integer.parseInt(countString);
+            --count;
+            this.redisTemplate.opsForValue().set("order:seckill:" + skuId, String.valueOf(count));
+            // 发送消息给消息队列，将来真正的减库存
+            SkuLockVo skuLockVo = new SkuLockVo();
+            skuLockVo.setCount(1);
+            skuLockVo.setSkuId(skuId);
+            String orderToken = IdWorker.getIdStr();
+            skuLockVo.setOrderToken(orderToken);
+            this.amqpTemplate.convertAndSend("GMALL-ORDER-EXCHANGE", "order.seckill", skuLockVo);
+            // 这个地方在redis中设置了一个对应该订单的值，用来判断后台数据库是否已经创建订单了
+            RCountDownLatch countDownLatch = this.redissonClient.getCountDownLatch("count:down:" + orderToken);
+            countDownLatch.trySetCount(1);
+            // 当数据库创建订单完成之后，需要调用一下这个countdown，说明这个订单创建成功了
+//            countDownLatch.countDown();
+            semaphore.release();
+            // 响应成功
+            return Resp.ok("恭喜你，秒杀成功! 赶紧付款吧");
+        }
+        return Resp.ok("再接再厉");
+    }
+
+    @GetMapping("seckill/query/{orderToken}")
+    public Resp<Object> querySecKill(@PathVariable("orderToken") String orderToken) throws InterruptedException {
+        // 查询订单的时候，只有当后台创建订单成功之后，才能去查询订单并响应，不然查询出来的订单是空
+        RCountDownLatch countDownLatch = this.redissonClient.getCountDownLatch("count:down:" + orderToken);
+        countDownLatch.await();
+        // 查询订单并响应
+        // 发送feign请求查询订单
+
+        return Resp.ok(null);
+    }
 
 }
