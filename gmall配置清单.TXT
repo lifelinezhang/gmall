@@ -1,0 +1,7 @@
+cd D:\apatchAb\httpd-2.4.43-o111f-x64-vc15\Apache24\bin
+然后使用ab进行压力测试
+
+配置清单：
+远程： rabbitmq，kibana，elasticsearch，nginx（未开启）
+本地：seata，nacos， redis，mysql，ab
+项目：G:\gmall-vue\gmall-shop
